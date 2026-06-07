@@ -7,7 +7,7 @@ import argparse
 import os
 import configparser
 import time
-from tools import send_msg
+# from tools import send_msg  # tools模块不存在，已注释
 
 # Pillow兼容性补丁
 import pillow_compat
@@ -55,7 +55,6 @@ class CQ(feapder.AirSpider):
             }
             log.info(f"准备登录，参数: username={USERNAME}, id={uid}, code={code_result}")
 
-            # 使用 feapder 发送登录请求
             try:
                 login_response_obj = feapder.Request(url=login_url, data=post_data).get_response()
                 login_response = login_response_obj.json
@@ -65,7 +64,6 @@ class CQ(feapder.AirSpider):
                 log.error(f"登录请求异常: {e}")
                 raise
 
-            # 处理登录响应
             try:
                 params = {"ticket": login_response["ticket"]}
             except KeyError:
@@ -135,8 +133,6 @@ class CQ(feapder.AirSpider):
         if type(e) is self.InfoError:
             self.send_msg(f"{e}", "ERROR")
             self.stop_spider()
-            # 注意：tools.delay_time 可能未导入，若报错请注释下一行
-            # tools.delay_time(1)
         elif type(e) is self.CodeError:
             self.send_msg(f"验证码错误\n验证码:{e.code}\n答案:{e.code_result}", "ERROR")
         elif type(e) is KeyError:
@@ -148,10 +144,9 @@ class CQ(feapder.AirSpider):
 
     @staticmethod
     def send_msg(msg, level="DEBUG", message_prefix=""):
-        msg = f"{USERNAME}\n{msg}"
-        send_msg(msg, level=level, message_prefix=message_prefix)
+        # 消息通知已禁用（tools模块不存在），仅打印日志
+        log.info(f"[通知] {msg}")
 
-    # 获取并识别验证码
     def code_ocr(self, code_base64_str):
         replace_str = {"o": "0", "O": "0", "l": "1", "i": "1", "I": "1", "s": "5", "S": "5", "b": "6", "B": "8"}
         ocr = ddddocr.DdddOcr()
@@ -160,12 +155,9 @@ class CQ(feapder.AirSpider):
             if key in code:
                 code = code.replace(key, value)
 
-        # 清理验证码字符串，只保留数字和运算符
         code_clean = ''.join([c for c in code if c.isdigit() or c in ['+', '-', '*', '/', '=']])
 
-        # 计算验证码答案
         try:
-            # 去掉最后的等号
             if code_clean.endswith('='):
                 code_calc = code_clean[:-1]
                 code_result = eval(code_calc)
@@ -177,37 +169,6 @@ class CQ(feapder.AirSpider):
 
         return code, code_result
 
-    # 新的验证码获取和识别方式（备用方案）
-    def get_and_ocr_captcha(self, save_dir=None):
-        import requests
-        from PIL import Image
-        import os
-
-        if not save_dir:
-            save_dir = os.path.join(os.path.dirname(__file__), "captcha_images")
-            os.makedirs(save_dir, exist_ok=True)
-
-        # 获取验证码
-        captcha_url = "https://jw.gzist.edu.cn/jwglxt/kaptcha?time=" + str(int(time.time() * 1000))
-        resp = requests.get(url=captcha_url)
-
-        # 获取当前目录下最大的数字编号
-        existing_files = [f for f in os.listdir(save_dir) if f.endswith('.png') and f.split('.')[0].isdigit()]
-        next_num = max([int(f.split('.')[0]) for f in existing_files]) + 1 if existing_files else 1
-
-        # 保存验证码图片
-        image_path = os.path.join(save_dir, f"{next_num}.png")
-        with open(image_path, "wb") as f:
-            f.write(resp.content)
-        print(f"验证码图片已保存到: {image_path}")
-
-        # 识别验证码
-        ocr = ddddocr.DdddOcr()
-        code = ocr.classification(resp.content)
-        print(f"识别结果: {code}")
-        return code, resp.content
-
-    # base64字符串转二进制流
     @staticmethod
     def base64_to_byte(s):
         base64_byte = base64.b64decode(s)
@@ -221,7 +182,6 @@ class CQ(feapder.AirSpider):
 
     def encrypt_password(self, password):
         try:
-            # 使用 subprocess 调用 Node.js 进行加密
             import subprocess
             js_code = self.js_from_file('./login.js')
             test_script = js_code + "\nconsole.log(encrypt('" + password + "'));"
@@ -239,7 +199,6 @@ class CQ(feapder.AirSpider):
 
         except Exception as e:
             log.error(f"Node.js加密失败，尝试使用明文密码: {e}")
-            # 如果Node.js加密失败，返回原始密码
             return password
 
 
@@ -261,7 +220,6 @@ def get_username_password_from_config(config_file, section):
 
 
 def get_username_password_manually():
-    # 尝试从 login.ini 读取
     config = configparser.ConfigParser()
     config_file = 'login.ini'
 
@@ -273,7 +231,6 @@ def get_username_password_manually():
             if username and password:
                 return username, password
 
-    # 如果配置文件为空或不存在，提示用户输入
     print("首次运行，请配置账号密码")
     username = input("请输入学号: ").strip()
     password = input("请输入密码: ").strip()
@@ -282,7 +239,6 @@ def get_username_password_manually():
         log.error("账号或密码不能为空")
         return None, None
 
-    # 保存到 login.ini
     if not config.has_section('loginInfo'):
         config.add_section('loginInfo')
     config.set('loginInfo', 'LOGIN_USERNAME', username)
